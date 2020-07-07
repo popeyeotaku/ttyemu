@@ -11,6 +11,8 @@ Features:
 - Limits output to an authentic 10 characters per second. Hit F5 to make it go
   faster (toggle on tkinter frontend, hold on pygame)
 
+- Sound (with the pygame frontend)!  If it's too loud, hit F7 to close the lid.
+
 - Scrolling (with page up and down - tkinter frontend has a scrollbar)
 
 - Output a form feed to clear everything
