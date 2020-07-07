@@ -323,7 +323,7 @@ class PygameFrontend:
             self.sounds.keypress(event.unicode)
             self.terminal.backend.write_char(event.unicode)
             pygame.display.update()
-        elif event.key == pygame.K_F6:
+        elif event.key == pygame.K_F5:
             self.terminal.backend.fast_mode = True
         elif event.key == pygame.K_F7:
             self.sounds.lid()
