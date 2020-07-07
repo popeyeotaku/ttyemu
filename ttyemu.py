@@ -7,6 +7,7 @@ import tkinter
 import tkinter.font
 import abc
 import subprocess
+import logging
 import os
 import shlex
 try:
@@ -20,8 +21,13 @@ except ImportError:
     pass
 try:
     import pygame
+    from sounds import PygameSounds
 except ImportError:
     pass
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 COLUMNS = 72
 TEXT_COLOR = (0x33, 0x33, 0x33)
@@ -226,8 +232,9 @@ class PygameFrontend:
     "Front-end using pygame for rendering"
     # pylint: disable=too-many-instance-attributes
     def __init__(self, target_surface=None, lines_per_page=8):
+        self.sounds = PygameSounds()
         pygame.init()
-        self.font = pygame.font.SysFont('monospace', 24)
+        self.font = pygame.font.SysFont('Teleprinter,TELETYPE 1945-1985,monospace', 24)
         self.font_width, self.font_height = self.font.size('X')
         self.width_pixels = COLUMNS * self.font_width
         if target_surface is None:
@@ -313,13 +320,18 @@ class PygameFrontend:
     def handle_key(self, event):
         "Handle a keyboard event"
         if event.unicode:
+            self.sounds.keypress(event.unicode)
             self.terminal.backend.write_char(event.unicode)
             pygame.display.update()
-        elif event.key == pygame.K_F5:
+        elif event.key == pygame.K_F6:
             self.terminal.backend.fast_mode = True
+        elif event.key == pygame.K_F7:
+            self.sounds.lid()
         elif event.key == pygame.K_PAGEUP:
+            self.sounds.platen()
             self.terminal.page_up()
         elif event.key == pygame.K_PAGEDOWN:
+            self.sounds.platen()
             self.terminal.page_down()
         else:
             pass
@@ -328,9 +340,12 @@ class PygameFrontend:
     def mainloop(self, terminal):
         "Run game loop"
         self.terminal = terminal
+        self.sounds.start()
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    self.sounds.stop()
+                    pygame.mixer.quit()
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
@@ -348,6 +363,11 @@ class PygameFrontend:
                     self.terminal.refresh_screen()
                 if event.type == self.char_event_num:
                     self.terminal.output_chars(event.chars)
+                    self.sounds.print_chars(event.chars)
+                if event.type in self.sounds.EVENTS:
+                    # Sound events notify that playback is ended on a sound or channel
+                    self.sounds.event(event.type)
+                
 
 # pylint: disable=unused-argument,no-self-use,missing-docstring
 class DummyFrontend:
@@ -586,7 +606,10 @@ class FiledescBackend(abc.ABC):
                     data = data.replace(b'\n', b'\r\n')
                 self.postchars(data.decode('ascii', 'replace'))
             else:
-                byte = os.read(self.read_fd, 1)
+                try:
+                    byte = os.read(self.read_fd, 1)
+                except OSError:
+                    break
                 if not byte:
                     break
                 if self.crmod:
@@ -671,7 +694,11 @@ def main(frontend, backend):
     backend_thread.start()
     frontend.mainloop(my_term)
 
-main(TkinterFrontend(), PtyBackend('sh'))
+main(PygameFrontend(), PtyBackend('sh'))
+
+#main(TkinterFrontend(), PtyBackend('sh'))
+#main(TkinterFrontend(), LoopbackBackend('sh'))
+
 #main(PygameFrontend(), LoopbackBackend())
 #main(TkinterFrontend(), ConptyBackend('ubuntu'))
 #main(PygameFrontend(), PipeBackend('py -3 -i -c ""', crmod=True, lecho=True))
