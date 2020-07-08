@@ -70,7 +70,7 @@ class PygameSounds:
         pygame.mixer.set_reserved(6)
         self.ch0 = pygame.mixer.Channel(0)  # used for on/off, background hum, lid
         self.ch1 = pygame.mixer.Channel(1)  # printing spaces (loop)
-        self.ch2 = pygame.mixer.Channel(2)  # printing characters (loop)
+        self.ch2 = pygame.mixer.Channel(3)  # printing characters (loop)
         self._chfx = [  # fx: input (keypresses), platen, bells, etc
             pygame.mixer.Channel(3),
             pygame.mixer.Channel(4),
@@ -83,8 +83,9 @@ class PygameSounds:
 
         # Play the power-on sound, then to background after 1.5
         self.ch0.play(self.get("motor-on"))
-        pygame.time.set_timer(self.EVENT_HUM, 1500)
+        pygame.time.set_timer(self.EVENT_SYNC, 1500)
         pygame.time.wait(1000)
+        self._start_paused()
 
     @property
     def chfx(self):
@@ -108,16 +109,16 @@ class PygameSounds:
 
     def lid(self):
         """Open or close the lid."""
-        # This just plays on the background channel.
         logger.debug("lid")
-        self.ch0.play(self.get("lid"))
+        self._fade_to_hum()
+        self.chfx.play(self.get("lid"))
         # Flip the lid state
         if self.lid_state == "down":
             self.lid_state = "up"
         else:
             self.lid_state = "down"
         # The main sounds will change with the new lid position
-        pygame.time.set_timer(self.EVENT_HUM, 250)
+        pygame.time.set_timer(self.EVENT_SYNC, 250)
 
     def platen(self):
         """Hand-scrolled platen for page up & down"""
@@ -131,6 +132,14 @@ class PygameSounds:
         self.ch0.play(self.hum_sound, loops=-1)
         self.ch1.play(self.spaces_sound, loops=-1)
         self.ch2.play(self.chars_sound, loops=-1)
+        self.hum_sound.set_volume(0.0)
+        self.spaces_sound.set_volume(0.0)
+        self.chars_sound.set_volume(0.0)
+
+    def _start_paused(self):
+        self._start_loops()
+        self.ch1.pause()
+        self.ch2.pause()
 
     def keypress(self, key):
         """Key pressed at the keyboard (may or may not echo)"""
@@ -139,8 +148,6 @@ class PygameSounds:
         if self.active_key_count > 1:
             # Just queue it and keep going
             return
-        # Press any key (they all sound similar)
-        self.chfx.play(self.get("key"))
         # In a while we can press another key
         pygame.time.set_timer(self.EVENT_KEY, 100)
         self._sound_for_keypress()
@@ -150,6 +157,7 @@ class PygameSounds:
             # No next keypress.  Cancel the timer.
             pygame.time.set_timer(self.EVENT_KEY, 0)
         else:
+            # Press any key (they all sound similar)
             self.chfx.play(self.get("key"))
 
     def print_chars(self, chars):
@@ -169,10 +177,10 @@ class PygameSounds:
         elif next_char == '\r':
             # Carriage return (not newline, that just sounds as a space)
             self.hum_sound.set_volume(0.0)
-            self.spaces_sound.set_volume(0.7)
+            self.spaces_sound.set_volume(1.0)
             self.chars_sound.set_volume(0.0)
-            # Reset the loop timing so it synchronizes better with the CR
             self.chfx.play(self.get("cr"))
+            # Reset the loop timing
             pygame.time.set_timer(self.EVENT_SYNC, 10)
         elif next_char == '\007':
             # Mute the hum/print while we do this
@@ -182,14 +190,70 @@ class PygameSounds:
             self.chfx.play(self.get("bell"))
         elif ord(next_char) <= 32 or next_char.isspace():
             # Control characters and spaces
+            self._fade_to_spaces()
+        else:
+            # Treat anything else as printable
+            self._fade_to_chars()
+
+    def _fade_to_hum(self):
+        if self.hum_sound.get_volume() <= 0.99:
+            self.hum_sound.set_volume(0.3)
+            self.spaces_sound.set_volume(self.spaces_sound.get_volume() * 0.7)
+            self.chars_sound.set_volume(self.chars_sound.get_volume() * 0.7)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(0.5)
+            self.spaces_sound.set_volume(self.spaces_sound.get_volume() * 0.7)
+            self.chars_sound.set_volume(self.chars_sound.get_volume() * 0.7)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(0.7)
+            self.spaces_sound.set_volume(self.spaces_sound.get_volume() * 0.7)
+            self.chars_sound.set_volume(self.chars_sound.get_volume() * 0.7)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(1.0)
+            self.spaces_sound.set_volume(0.0)
+            self.chars_sound.set_volume(0.0)
+        self.ch1.pause()
+        self.ch2.pause()
+
+    def _fade_to_spaces(self):
+        if self.spaces_sound.get_volume() <= 0.99:
+            self.hum_sound.set_volume(self.hum_sound.get_volume() * 0.7)
+            self.spaces_sound.set_volume(0.3)
+            self.chars_sound.set_volume(self.chars_sound.get_volume() * 0.7)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(self.hum_sound.get_volume() * 0.7)
+            self.spaces_sound.set_volume(0.5)
+            self.chars_sound.set_volume(self.chars_sound.get_volume() * 0.7)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(self.hum_sound.get_volume() * 0.7)
+            self.spaces_sound.set_volume(0.7)
+            self.chars_sound.set_volume(self.chars_sound.get_volume() * 0.7)
+            pygame.time.wait(3)
             self.hum_sound.set_volume(0.0)
             self.spaces_sound.set_volume(1.0)
             self.chars_sound.set_volume(0.0)
-        else:
-            # Treat anything else as printable
+        self.ch1.unpause()
+        self.ch2.unpause()
+
+    def _fade_to_chars(self):
+        if self.chars_sound.get_volume() <= 0.99:
+            self.hum_sound.set_volume(self.hum_sound.get_volume() * 0.7)
+            self.spaces_sound.set_volume(self.spaces_sound.get_volume() * 0.7)
+            self.chars_sound.set_volume(0.3)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(self.hum_sound.get_volume() * 0.7)
+            self.spaces_sound.set_volume(self.spaces_sound.get_volume() * 0.7)
+            self.chars_sound.set_volume(0.5)
+            pygame.time.wait(3)
+            self.hum_sound.set_volume(self.hum_sound.get_volume() * 0.7)
+            self.spaces_sound.set_volume(self.spaces_sound.get_volume() * 0.7)
+            self.chars_sound.set_volume(0.7)
+            pygame.time.wait(3)
             self.hum_sound.set_volume(0.0)
             self.spaces_sound.set_volume(0.0)
             self.chars_sound.set_volume(1.0)
+        self.ch1.unpause()
+        self.ch2.unpause()
 
     def event(self, evt):
         # A pygame event happened
@@ -201,11 +265,8 @@ class PygameSounds:
             if self.active_printout:
                 # No hum yet, we're printing
                 return
-            # Go back to playing the hum on loop, and reset the spaces/chars loops
-            self._start_loops()
-            self.hum_sound.set_volume(1.0)
-            self.spaces_sound.set_volume(0.0)
-            self.chars_sound.set_volume(0.0)
+            # Go back to playing the hum on loop, and pause the spaces/chars loops
+            self._fade_to_hum()
 
         elif evt == self.EVENT_KEY:
             logger.debug("EVENT_KEY")
@@ -217,11 +278,10 @@ class PygameSounds:
             self._sound_for_char()
 
         elif evt == self.EVENT_SYNC:
+            # Sync after startup and CR: reset the spaces/chars loops.
             pygame.time.set_timer(self.EVENT_SYNC, 0)
+            pygame.time.set_timer(self.EVENT_HUM, 100)
             self._start_loops()
-            self.hum_sound.set_volume(0.0)
-            self.spaces_sound.set_volume(1.0)
-            self.chars_sound.set_volume(0.0)
 
         else:
             logger.debug("Event: %s", evt)
