@@ -589,6 +589,7 @@ class TelnetBackend:
         self.postchars = postchars
         self.host = host
         self.port = port
+        self.will_naws = 0
 
     def write_char(self, char):
         "Sends a keyboard character to the host"
@@ -607,12 +608,12 @@ class TelnetBackend:
                     sock.sendall(IAC + SB + TSPEED + BINARY + b'110,110' + IAC + SE)
                 elif sbdata == TTYPE + ECHO:
                     sock.sendall(IAC + SB + TTYPE + BINARY + b'tty33' + IAC + SE)
-                elif sbdata == NAWS + ECHO:
-                    sock.sendall(IAC + SB + NAWS + bytes([0, 72, 0, 24]) + IAC + SE)
             if cmd in (DO, DONT):
                 if opt in [TTYPE, TSPEED, NAWS]:
                     logger.info("IAC WILL %s", ord(opt))
                     sock.sendall(IAC + WILL + opt)
+                    if opt == NAWS:
+                        self.will_naws = 1
                 else:
                     logger.debug("IAC WONT %s", ord(opt))
                     sock.sendall(IAC + WONT + opt)
@@ -631,8 +632,13 @@ class TelnetBackend:
                 data = self.conn.read_eager()
             except EOFError:
                 break
+            time_now = int(time.time())
+            if self.will_naws and time_now > self.will_naws + 30:
+                self.will_naws = time_now
+                self.conn.sock.sendall(IAC + SB + NAWS + bytes([0, 72, 0, 24]) + IAC + SE)
             if not data:
                 continue
+            logger.info("%d bytes", len(data))
             for datum in data:
                 try:
                     self.postchars(bytes([datum]).decode('ascii', 'replace'))
@@ -779,9 +785,8 @@ def main(frontend, backend):
 
 main(PygameFrontend(), PtyBackend('sh'))
 
-#main(PygameFrontend(), TelnetBackend("lambda.moo.mud.org", port=8888))
+#main(PygameFrontend(), TelnetBackend("localhost", port=23))
 #main(PygameFrontend(), TelnetBackend("bbs.fozztexx.com"))
-#main(PygameFrontend(), TelnetBackend("particlesbbs.dyndns.org", port=6400))
 #main(PygameFrontend(), ParamikoBackend("172.23.97.23", "user", port=2222, keyfile="C:\\Users\\user\\.ssh\\id_rsa"))
 #main(TkinterFrontend(), PtyBackend('sh'))
 #main(TkinterFrontend(), LoopbackBackend('sh'))
