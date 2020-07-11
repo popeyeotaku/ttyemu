@@ -608,7 +608,7 @@ class TelnetBackend:
                 elif sbdata == TTYPE + ECHO:
                     sock.sendall(IAC + SB + TTYPE + BINARY + b'tty33' + IAC + SE)
                 elif sbdata == NAWS + ECHO:
-                    sock.sendall(IAC + SB + NAWS + 0 + 72 + 0 + 24 + IAC + SE)
+                    sock.sendall(IAC + SB + NAWS + bytes([0, 72, 0, 24]) + IAC + SE)
             if cmd in (DO, DONT):
                 if opt in [TTYPE, TSPEED, NAWS]:
                     logger.info("IAC WILL %s", ord(opt))
