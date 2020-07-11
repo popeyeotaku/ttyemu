@@ -234,7 +234,7 @@ class PygameFrontend:
     def __init__(self, target_surface=None, lines_per_page=8):
         self.sounds = PygameSounds()
         pygame.init()
-        self.font = pygame.font.SysFont('Teleprinter,TELETYPE 1945-1985,monospace', 24)
+        self.font = self._findfont(22)
         self.font_width, self.font_height = self.font.size('X')
         self.width_pixels = COLUMNS * self.font_width
         if target_surface is None:
@@ -248,6 +248,24 @@ class PygameFrontend:
         self.lines_per_page = lines_per_page
         self.char_event_num = pygame.USEREVENT+1
         self.terminal = None
+
+    def _findfont(self, fontsize):
+        # pygame SysFont doesn't help on Windows, so look for specific files in known locations
+        paths = []
+        if "WINDIR" in os.environ:
+            path = os.path.join(os.environ["WINDIR"], "Fonts")
+            paths.append(os.path.join(path, "TELE.TTF"))
+            paths.append(os.path.join(path, "TELETYPE1945-1985.ttf"))
+        if "USERPROFILE" in os.environ:
+            path = os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "Microsoft", "Windows", "Fonts")
+            paths.append(os.path.join(path, "TELE.TTF"))
+            paths.append(os.path.join(path, "TELETYPE1945-1985.ttf"))
+        for path in paths:
+            try:
+                return pygame.font.Font(path, fontsize)
+            except FileNotFoundError:
+                pass
+        return pygame.font.SysFont('Teleprinter,TELETYPE 1945-1985,monospace', fontsize)
 
     def reinit(self, lines_per_page=None):
         "Clears and resets all terminal state"
@@ -556,7 +574,7 @@ class ParamikoBackend:
                 if not byte:
                     break
                 self.postchars(byte.decode('ascii', 'replace'))
-                time.sleep(0.1)
+                time.sleep(0.105)
         self.channel = None
         self.postchars("Disconnected. Local mode.\r\n")
 
