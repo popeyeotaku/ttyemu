@@ -540,11 +540,12 @@ class LoopbackBackend:
 
 class ParamikoBackend:
     "Connects a remote host to the terminal"
-    def __init__(self, host, username, keyfile, postchars=lambda chars: None):
+    def __init__(self, host, username, keyfile, port=22, postchars=lambda chars: None):
         self.fast_mode = False
         self.channel = None
         self.postchars = postchars
         self.host = host
+        self.port = port
         self.username = username
         self.keyfile = keyfile
 
@@ -557,7 +558,7 @@ class ParamikoBackend:
 
     def thread_target(self):
         "Method for thread setup"
-        ssh = paramiko.Transport((self.host, 22))
+        ssh = paramiko.Transport((self.host, self.port))
         key = paramiko.RSAKey.from_private_key_file(self.keyfile)
         ssh.connect(username=self.username, pkey=key)
         self.channel = ssh.open_session()
@@ -633,7 +634,7 @@ class FiledescBackend(abc.ABC):
                 if self.crmod:
                     byte = byte.replace(b'\n', b'\r\n')
                 self.postchars(byte.decode('ascii', 'replace'))
-                time.sleep(0.1)
+                time.sleep(0.105)
         self.teardown()
         self.postchars("Disconnected. Local mode.\r\n")
 
@@ -714,6 +715,7 @@ def main(frontend, backend):
 
 main(PygameFrontend(), PtyBackend('sh'))
 
+#main(PygameFrontend(), ParamikoBackend("172.23.97.23", "user", port=2222, keyfile="C:\\Users\\user\\.ssh\\id_rsa"))
 #main(TkinterFrontend(), PtyBackend('sh'))
 #main(TkinterFrontend(), LoopbackBackend('sh'))
 
