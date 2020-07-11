@@ -606,7 +606,7 @@ class TelnetBackend:
                 if sbdata == TSPEED + ECHO:
                     sock.sendall(IAC + SB + TSPEED + BINARY + b'110,110' + IAC + SE)
                 elif sbdata == TTYPE + ECHO:
-                    sock.sendall(IAC + SB + TTYPE + BINARY + b'TTY33' + IAC + SE)
+                    sock.sendall(IAC + SB + TTYPE + BINARY + b'tty33' + IAC + SE)
                 elif sbdata == NAWS + ECHO:
                     sock.sendall(IAC + SB + NAWS + 0 + 72 + 0 + 24 + IAC + SE)
             if cmd in (DO, DONT):
@@ -781,6 +781,7 @@ main(PygameFrontend(), PtyBackend('sh'))
 
 #main(PygameFrontend(), TelnetBackend("lambda.moo.mud.org", port=8888))
 #main(PygameFrontend(), TelnetBackend("bbs.fozztexx.com"))
+#main(PygameFrontend(), TelnetBackend("particlesbbs.dyndns.org", port=6400))
 #main(PygameFrontend(), ParamikoBackend("172.23.97.23", "user", port=2222, keyfile="C:\\Users\\user\\.ssh\\id_rsa"))
 #main(TkinterFrontend(), PtyBackend('sh'))
 #main(TkinterFrontend(), LoopbackBackend('sh'))
