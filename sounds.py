@@ -60,12 +60,19 @@ class PygameSounds:
 
     def start(self):
         # Load the sound library
-        with os.scandir(path=os.path.join(os.path.dirname(__file__), "sounds")) as scan:
-            for entry in scan:
-                if entry.is_file:
-                    filename, ext = os.path.splitext(entry.name)
-                    if ext == ".wav":
-                        self.sounds[filename] = Sound(entry.path)
+        try:
+            with os.scandir(path=os.path.join(os.path.dirname(__file__), "sounds")) as scan:
+                for entry in scan:
+                    if entry.is_file:
+                        filename, ext = os.path.splitext(entry.name)
+                        if ext == ".wav":
+                            self.sounds[filename] = Sound(entry.path)
+        except pygame.error:
+            logging.exception("Could not initialize sounds.")
+            return
+        if not self.sounds:
+            logging.error("Could not load sounds.")
+            return
 
         pygame.mixer.set_reserved(6)
         self.ch0 = pygame.mixer.Channel(0)  # used for on/off, background hum, lid
@@ -99,6 +106,8 @@ class PygameSounds:
         return self._chfx[self._fx]
 
     def stop(self):
+        if not self.sounds:
+            return
         # Play the power-off sound
         self.ch0.play(self.get("motor-off"))
         # Wait until it plays out a bit
@@ -109,6 +118,8 @@ class PygameSounds:
 
     def lid(self):
         """Open or close the lid."""
+        if not self.sounds:
+            return
         logger.debug("lid")
         self._fade_to_hum()
         self.chfx.play(self.get("lid"))
@@ -122,6 +133,8 @@ class PygameSounds:
 
     def platen(self):
         """Hand-scrolled platen for page up & down"""
+        if not self.sounds:
+            return
         logger.debug("platen")
         self.chfx.play(self.get("platen"))
 
@@ -143,6 +156,8 @@ class PygameSounds:
 
     def keypress(self, key):
         """Key pressed at the keyboard (may or may not echo)"""
+        if not self.sounds:
+            return
         logger.debug("keypress")
         self.active_key_count = self.active_key_count + 1
         if self.active_key_count > 1:
@@ -161,6 +176,8 @@ class PygameSounds:
             self.chfx.play(self.get("key"))
 
     def print_chars(self, chars):
+        if not self.sounds:
+            return
         logger.debug("print: %s", chars)
         # Add to the string that we're printing
         self.active_printout = self.active_printout + chars
@@ -257,6 +274,8 @@ class PygameSounds:
 
     def event(self, evt):
         # A pygame event happened
+        if not self.sounds:
+            return
         if evt == self.EVENT_HUM:
             logger.debug("EVENT_HUM")
             # Cancel the hum timer
