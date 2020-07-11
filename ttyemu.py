@@ -10,6 +10,7 @@ import subprocess
 import logging
 import os
 import shlex
+from telnetlib import Telnet, IAC, WILL, WONT, DO, DONT, SB, SE, BINARY, ECHO, TTYPE, TSPEED, NAWS
 try:
     import pty
     import termios
@@ -580,6 +581,69 @@ class ParamikoBackend:
         self.postchars("Disconnected. Local mode.\r\n")
 
 
+class TelnetBackend:
+    "Connects a remote host to the terminal"
+    def __init__(self, host, port=23, postchars=lambda chars: None):
+        self.fast_mode = False
+        self.conn = None
+        self.postchars = postchars
+        self.host = host
+        self.port = port
+
+    def write_char(self, char):
+        "Sends a keyboard character to the host"
+        if self.conn is not None:
+            self.conn.write(char.encode())
+        else:
+            self.postchars(char)
+
+    def thread_target(self):
+        "Method for thread setup"
+        def telnet_callback(sock, cmd, opt):
+            if cmd == SE:
+                sbdata = self.conn.read_sb_data()
+                logger.info("SE: %s", sbdata)
+                if sbdata == TSPEED + ECHO:
+                    sock.sendall(IAC + SB + TSPEED + BINARY + b'110,110' + IAC + SE)
+                elif sbdata == TTYPE + ECHO:
+                    sock.sendall(IAC + SB + TTYPE + BINARY + b'TTY33' + IAC + SE)
+                elif sbdata == NAWS + ECHO:
+                    sock.sendall(IAC + SB + NAWS + 0 + 72 + 0 + 24 + IAC + SE)
+            if cmd in (DO, DONT):
+                if opt in [TTYPE, TSPEED, NAWS]:
+                    logger.info("IAC WILL %s", ord(opt))
+                    sock.sendall(IAC + WILL + opt)
+                else:
+                    logger.debug("IAC WONT %s", ord(opt))
+                    sock.sendall(IAC + WONT + opt)
+            elif cmd in (WILL, WONT):
+                if opt in [TTYPE, TSPEED, NAWS]:
+                    logger.info("IAC DO %s", ord(opt))
+                    sock.sendall(IAC + DO + opt)
+                else:
+                    logger.debug("IAC DONT %s", ord(opt))
+                    sock.sendall(IAC + DONT + opt)
+
+        self.conn = Telnet(host=self.host, port=self.port)
+        self.conn.set_option_negotiation_callback(telnet_callback)
+        while True:
+            try:
+                data = self.conn.read_eager()
+            except EOFError:
+                break
+            if not data:
+                continue
+            for datum in data:
+                try:
+                    self.postchars(bytes([datum]).decode('ascii', 'replace'))
+                except:
+                    logger.error("ERR '%c'", datum)
+                if not self.fast_mode:
+                    time.sleep(0.105)
+        self.conn = None
+        self.postchars("Disconnected. Local mode.\r\n")
+
+
 class FiledescBackend(abc.ABC):
     "Base classes for backends using os.read/write"
     def __init__(self, lecho=False, crmod=False, postchars=lambda chars: None):
@@ -715,6 +779,8 @@ def main(frontend, backend):
 
 main(PygameFrontend(), PtyBackend('sh'))
 
+#main(PygameFrontend(), TelnetBackend("lambda.moo.mud.org", port=8888))
+#main(PygameFrontend(), TelnetBackend("bbs.fozztexx.com"))
 #main(PygameFrontend(), ParamikoBackend("172.23.97.23", "user", port=2222, keyfile="C:\\Users\\user\\.ssh\\id_rsa"))
 #main(TkinterFrontend(), PtyBackend('sh'))
 #main(TkinterFrontend(), LoopbackBackend('sh'))
