@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 COLUMNS = 72
 TEXT_COLOR = (0x33, 0x33, 0x33)
 
+
 def upper(char):
     "Converts a character to uppercase in the dumbest way possible."
     char = ord(char)
@@ -40,6 +41,7 @@ def upper(char):
     if char > 64:
         char = 32 | (char & 31)
     return chr(char+32)
+
 
 def background_color():
     "Return a background color."
@@ -102,13 +104,16 @@ class AbstractLine:
         for begin, text in line.extents:
             print("    ", begin, repr(text))
 
+
 SLOP = 4
+
+
 class TkinterFrontend:
     "Front-end using tkinter"
     # pylint: disable=too-many-instance-attributes
     def __init__(self, terminal=None):
-        self.fg='#%02x%02x%02x' % TEXT_COLOR
-        bg='#%02x%02x%02x' % background_color()
+        self.fg = '#%02x%02x%02x' % TEXT_COLOR
+        bg = '#%02x%02x%02x' % background_color()
         self.terminal = terminal
         self.root = tkinter.Tk()
         if 'Teleprinter' in tkinter.font.families(self.root):
@@ -144,7 +149,7 @@ class TkinterFrontend:
         self.canvas.config(
             xscrollcommand=xscrollbar.set,
             yscrollcommand=yscrollbar.set,
-            offset='%d,%d'%(-SLOP,-SLOP),
+            offset='%d,%d' % (-SLOP, -SLOP),
             scrollregion=(-SLOP, -SLOP, COLUMNS*self.font_width+SLOP, self.font_height+SLOP),
         )
         xscrollbar.config(command=self.canvas.xview)
@@ -299,9 +304,9 @@ class PygameFrontend:
         line0 = page_number * self.lines_per_page
         line1 = (page_number + 1) * self.lines_per_page
         if line1 < scroll_base:
-            return # page is off top of screen
+            return  # page is off top of screen
         if line0 > scroll_base + self.lines_screen():
-            return # page is off bottom of screen
+            return  # page is off bottom of screen
         dest = (0, self.font_height*(line0 - scroll_base))
         area = pygame.Rect(0, 0, self.width_pixels, self.lines_per_page*self.font_height)
         page_surface = self.page_surfaces[page_number]
@@ -386,7 +391,7 @@ class PygameFrontend:
                 if event.type in self.sounds.EVENTS:
                     # Sound events notify that playback is ended on a sound or channel
                     self.sounds.event(event.type)
-                
+
 
 # pylint: disable=unused-argument,no-self-use,missing-docstring
 class DummyFrontend:
@@ -527,6 +532,7 @@ class Terminal:
         if self.scroll_base < 0:
             self.scroll_base = 0
 
+
 class LoopbackBackend:
     "Just sends characters from the keyboard back to the screen"
     def __init__(self, postchars=lambda chars: None):
@@ -538,6 +544,7 @@ class LoopbackBackend:
 
     def thread_target(self):
         pass
+
 
 class ParamikoBackend:
     "Connects a remote host to the terminal"
@@ -642,7 +649,7 @@ class TelnetBackend:
             for datum in data:
                 try:
                     self.postchars(bytes([datum]).decode('ascii', 'replace'))
-                except:
+                except pygame.error:
                     logger.error("ERR '%c'", datum)
                 if not self.fast_mode:
                     time.sleep(0.105)
@@ -708,6 +715,7 @@ class FiledescBackend(abc.ABC):
         self.teardown()
         self.postchars("Disconnected. Local mode.\r\n")
 
+
 class PipeBackend(FiledescBackend):
     """Backend for a subprocess running in a pipe pair.
     Not very useful, but cross-platform."""
@@ -733,6 +741,7 @@ class PipeBackend(FiledescBackend):
         self.proc = None
         self.read_fd = self.write_fd = None
 
+
 class PtyBackend(FiledescBackend):
     """Backend for a subprocess running in a pipe pair.
     Not very useful, but cross-platform."""
@@ -755,8 +764,8 @@ class PtyBackend(FiledescBackend):
         else:
             try:
                 attr = termios.tcgetattr(0)
-                attr[3] &= ~(termios.ECHOE|termios.ECHOKE)
-                attr[3] |= termios.ECHOPRT|termios.ECHOK
+                attr[3] &= ~(termios.ECHOE | termios.ECHOKE)
+                attr[3] |= termios.ECHOPRT | termios.ECHOK
                 attr[4] = termios.B110
                 attr[5] = termios.B110
                 attr[6][termios.VERASE] = b'#'
@@ -775,6 +784,7 @@ class PtyBackend(FiledescBackend):
         os.close(self.read_fd)
         self.read_fd = self.write_fd = None
 
+
 def main(frontend, backend):
     "Main function"
     my_term = Terminal(frontend, backend)
@@ -783,9 +793,10 @@ def main(frontend, backend):
     backend_thread.start()
     frontend.mainloop(my_term)
 
+
 main(PygameFrontend(), PtyBackend('sh'))
 
-#main(PygameFrontend(), TelnetBackend("localhost", port=23))
+#main(PygameFrontend(), TelnetBackend("telehack.com", port=23))
 #main(PygameFrontend(), TelnetBackend("bbs.fozztexx.com"))
 #main(PygameFrontend(), ParamikoBackend("172.23.97.23", "user", port=2222, keyfile="C:\\Users\\user\\.ssh\\id_rsa"))
 #main(TkinterFrontend(), PtyBackend('sh'))
