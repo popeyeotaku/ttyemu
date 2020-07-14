@@ -637,7 +637,7 @@ class TelnetBackend:
         while True:
             try:
                 data = self.conn.read_eager()
-            except EOFError:
+            except (EOFError, ConnectionResetError):
                 break
             time_now = int(time.time())
             if self.will_naws and time_now > self.will_naws + 30:
