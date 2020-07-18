@@ -796,6 +796,7 @@ def main(frontend, backend):
 
 main(PygameFrontend(), PtyBackend('sh'))
 
+#main(PygameFrontend(), PipeBackend('powershell -noexit -command ". mode.com con: cols=72; cd \\; sleep 2"', crmod=True, lecho=False))
 #main(PygameFrontend(), TelnetBackend("telehack.com", port=23))
 #main(PygameFrontend(), TelnetBackend("bbs.fozztexx.com"))
 #main(PygameFrontend(), ParamikoBackend("172.23.97.23", "user", port=2222, keyfile="C:\\Users\\user\\.ssh\\id_rsa"))
