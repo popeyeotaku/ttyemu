@@ -368,7 +368,7 @@ class TkinterFrontend(Frontend):
         xscrollbar.config(command=self.canvas.xview)
         yscrollbar.config(command=self.canvas.yview)
 
-    def key(self, event: tkinter.Event[Any]) -> None:
+    def key(self, event: tkinter.Event) -> None:
         """Handle a keyboard event."""
         # print(event)
         assert self.terminal is not None
