@@ -12,6 +12,8 @@ import subprocess
 import logging
 import os
 import shlex
+import asyncio
+import telnetlib3
 from telnetlib import (
     Telnet,
     IAC,
@@ -716,7 +718,7 @@ class LoopbackBackend(Backend):
         pass
 
 
-class ParamikoBackend:
+class ParamikoBackend(Backend):
     """Connects a remote host to the terminal."""
 
     def __init__(
@@ -774,7 +776,7 @@ class ParamikoBackend:
         self.postchars("Disconnected. Local mode.\r\n")
 
 
-class TelnetBackend:
+class TelnetBackend(Backend):
     """Connects a remote host to the terminal."""
 
     def __init__(
@@ -857,6 +859,65 @@ class TelnetBackend:
                         time.sleep(0.105)
         self.conn = None
         self.postchars("Disconnected. Local mode.\r\n")
+
+
+class TelnetLib3Backend(Backend):
+    """A backend using telnetlib3."""
+
+    def __init__(
+        self,
+        host: str,
+        port: int = 23,
+        lines_per_screen: int = 24,
+        postchars: Callable[[str], None] = lambda chars: None,
+    ) -> None:
+        """Create the backend.
+
+        host: the host address to connect to.
+        port: the host port.
+        lines_per_screen: not too important.
+        postchars: routine to put characters into the frontend.
+        """
+        super().__init__(postchars)
+        self._host = host
+        self._port = port
+        self._lines_per_screen = lines_per_screen
+        self._reader: telnetlib3.TelnetUnicodeReader | None = None
+        self._writer: telnetlib3.TelnetUnicodeWriter | None = None
+
+    def write_char(self, char: str) -> None:
+        """Write a character from the keyboard to the backend."""
+        if self._writer is not None:
+            self._writer.write(char)
+        else:
+            self.postchars(char)
+
+    async def reader(self) -> None:
+        """Read input from the telnet and send it to the frontend in a loop."""
+        while self._reader is not None:
+            data = await self._reader.read(1)
+            try:
+                self.postchars(data)
+            except pygame.error:
+                logger.error(f"ERR {data}")
+            if not self.fast_mode:
+                await asyncio.sleep(0.105)
+
+    def thread_target(self) -> None:
+        """Set everything up."""
+        runner = asyncio.Runner()
+        self._reader, self._writer = runner.run(
+            telnetlib3.open_connection(
+                self._host,
+                self._port,
+                encoding="ascii",
+                term="tty33",
+                cols=COLUMNS,
+                rows=self._lines_per_screen,
+                tspeed=(110, 110),
+            )
+        )
+        runner.run(self.reader())
 
 
 class FiledescBackend(Backend, abc.ABC):
@@ -1045,7 +1106,7 @@ def main(frontend: Frontend, backend: Backend):
     frontend.mainloop(my_term)
 
 
-main(PygameFrontend(), PtyBackend("sh"))
+# main(PygameFrontend(), PtyBackend("sh"))
 
 # main(PygameFrontend(), PipeBackend('powershell -noexit -command ". mode.com con: cols=72; cd \\; sleep 2"', crmod=True, lecho=False))
 # main(PygameFrontend(), TelnetBackend("telehack.com", port=23))
